@@ -1,0 +1,711 @@
+---
+title: "video games sales"
+format: pdf
+editor: visual
+---
+
+# **1-Introduction**
+
+## **Data Set Description**
+
+There are **16 variables** in this data set:
+
+-   **6 categorical** variables,
+
+-   **9 continuous** variables, and
+
+-   **1** variable to accomodate video game name.
+
+    The following is the **structure of the data set**.
+
+    |  **Variable Name**  |                  **Description**                  |          **Sample Data**           |
+    |:-------------------:|:-------------------------------------------------:|:----------------------------------:|
+    |      **Name**       |               Title of video games                | Super Mario Bros.; Wii Sports; ... |
+    |    **Platform**     |       The platform of video games released        |           3DO; 3DS; ...            |
+    | **Year_of_Release** |           Year of video games released            |          1980 ; 2020; ...          |
+    |      **Genre**      |               Genre of video games                |       Action; Adventure; ...       |
+    |    **Publisher**    |             Publisher of video games              |     Nintendo; Activision; ...      |
+    |    **NA_Sales**     |  Video game sales in North America (in millions)  |         41.36; 29.08; ...          |
+    |    **EU_Sales**     |     Video game sales in Europe (in millions)      |          28.96; 3.58; ...          |
+    |    **JP_Sales**     |      Video game sales in Japan (in millions)      |          3.77; 6.81; ...           |
+    |   **Other_Sales**   | Video game sales in other countries (in millions) |          8.45; 0.77; ...           |
+    |  **Global_Sales**   |             Total of worldwide sales              |         82.53; 40.24; ...          |
+    |  **Critic_Score**   |             Score given by the media              |            76; 82; ...             |
+    |  **Critic_Count**   |         Number of critics given by media          |            51; 73; ...             |
+    |   **User_Score**    |        Score given by the video games user        |            8; 8.3; ...             |
+    |   **User_Count**    |        Number of critics given by the user        |           322; 709; ...            |
+    |    **Developer**    |               Video games developer               |       Nintendo; Ubisoft; ...       |
+    |     **Rating**      |    Rating of video games based on ESRB ratings    |           AO; E10+; ...            |
+
+Dataset Link: <https://www.kaggle.com/datasets/sidtwr/videogames-sales-dataset?select=Video_Games_Sales_as_at_22_Dec_2016.csv>
+
+# **2-Importing Libraries**
+
+importing libraries that will be used in this notebook.
+
+```{r}
+# Importing Libraries
+library(readr) 
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(ggplot2)
+library(corrplot)
+library(broom)
+library(DataExplorer)
+library(gridExtra)
+library(caret)
+library(RColorBrewer)
+library(missForest)
+library(caTools)
+library(jtools)
+library(mice)
+library(randomForest)
+library(e1071)
+library(ROCR)
+library(klaR)
+```
+
+# **3-Reading Data Set**
+
+After importing libraries, the dataset will be imported as well. A glimpse of imported datasets will also shown in this section
+
+```{r}
+library(readr)
+df <- read_csv("C:/Users/21697/OneDrive/Bureau/Video_Games_Sales_as_at_22_Dec_2016.csv")
+dim(df)
+
+```
+
+retrieve the full column specification
+
+```{r}
+spec(df)
+
+```
+
+Show first rows of data
+
+```{r}
+head(df)
+```
+
+# **4-Data Exploration**
+
+Changing 'character' columns to factor
+
+```{r}
+df$Platform=as.factor(df$Platform)
+df$Genre=as.factor(df$Genre)
+df$Publisher=as.factor(df$Publisher)
+df$Developer=as.factor(df$Developer)
+df$Rating=as.factor(df$Rating)
+df$Year_of_Release=as.numeric(df$Year_of_Release)
+```
+
+## **4.1 Categorical Variable**
+
+The first type of variable that I will explore is categorical variable.
+
+### **4.1.1 Name**
+
+```{r}
+df %>% summarise(n_distinct(Name))
+```
+
+There are 11563 unique video games title in the dataset.
+
+### **4.1.2 Platform**
+
+```{r}
+df %>%   group_by(Platform) %>%   summarise(Count = n(),Perc=round(n()/nrow(.)*100,2)) %>%   arrange(desc(Count))
+```
+
+.There are 31 platforms of video games. Platform distribution can be seen above.\
+.In this dataset, PS2 have the highest percentage from all platforms (12.93%).
+
+### **4.1.3 Genre**
+
+```{r}
+df %>%
+  group_by(Genre) %>%
+  summarise(Count = n(),Perc=round(n()/nrow(.)*100,2)) %>%
+  arrange(desc(Count))
+```
+
+.There are 13 different genres and 'Action' is the most popular genre (20.16%).
+
+### **4.1.4 Publisher**
+
+```{r}
+df %>%
+  group_by(Publisher) %>%
+  summarise(Count = n(),Perc=round(n()/nrow(.)*100,2)) %>%
+  arrange(desc(Count))
+```
+
+.There are 582 publishers of video games. 'Electronic Arts' is the most popular publisher (8.11%).
+
+### **4.1.5 Developer**
+
+```{r}
+df %>%
+  group_by(Developer) %>%
+  summarise(Count = n(),Perc=round(n()/nrow(.)*100,2)) %>%
+  arrange(desc(Count))
+```
+
+.There are 1697 developers of video games. In this dataset, 'Ubisoft' is the most popular developer (39.61%).
+
+### **4.1.6 Rating**
+
+```{r}
+df %>%
+  group_by(Rating) %>%
+  summarise(Count = n(),Perc=round(n()/nrow(.)*100,2)) %>%
+  arrange(desc(Count))
+```
+
+.There are 9 ratings of video games based on ESRB ratings.\
+.In this dataset, 'E' (everyone) rating is the highest rating in dataset (23.87%).\
+.There are also some null value in Rating column, this will be imputed in data manipulation process
+
+## **4.2 Numerical Variable**
+
+The second variable that I will explore is categorical variable.
+
+### **4.2.1 NA_Sales**
+
+```{r}
+df %>%
+  summarise(is_NULL=sum(is.na(NA_Sales)==1),
+            is_NOT_NULL=sum(!is.na(NA_Sales)==1)
+            )
+```
+
+```{r}
+df%>%
+  filter(!is.na(NA_Sales))%>%
+  summarise(
+    Max=max(NA_Sales),
+    Min=min(NA_Sales),
+    Mean=mean(NA_Sales),
+    Median=median(NA_Sales),
+    QUA1=quantile(NA_Sales,1/4),
+    QUA3=quantile(NA_Sales,3/4),
+    IQR=IQR(NA_Sales)
+)
+```
+
+.There is no null value on NA_Sales column. However, for minimum value, there are "0" values on column.
+
+### **4.2.2 EU_Sales**
+
+```{r}
+df %>%
+  summarise(is_NULL=sum(is.na(EU_Sales)==1),
+            is_NOT_NULL=sum(!is.na(EU_Sales)==1)
+            )
+```
+
+```{r}
+df%>%
+  filter(!is.na(EU_Sales))%>%
+  summarise(
+    Max=max(EU_Sales),
+    Min=min(EU_Sales),
+    Mean=mean(EU_Sales),
+    Median=median(EU_Sales),
+    QUA1=quantile(EU_Sales,1/4),
+    QUA3=quantile(EU_Sales,3/4),
+    IQR=IQR(EU_Sales)
+)
+```
+
+.There is no null value on EU_Sales column but for minimum value, there are "0" values on column.
+
+### **4.2.3 JP_Sales**
+
+```{r}
+df %>%
+  summarise(is_NULL=sum(is.na(JP_Sales)==1),
+            is_NOT_NULL=sum(!is.na(JP_Sales)==1)
+            )
+```
+
+```{r}
+df %>%
+  filter(!is.na(JP_Sales))%>%
+  summarise(
+    Max=max(JP_Sales),
+    Min=min(JP_Sales),
+    Mean=mean(JP_Sales),
+    Median=median(JP_Sales),
+    QUA1=quantile(JP_Sales,1/4),
+    QUA3=quantile(JP_Sales,3/4),
+    IQR=IQR(JP_Sales)
+)
+```
+
+.There is no null value on JP_Sales column.\
+.However, for minimum value, there is "0" values on column.
+
+### **4.2.4 Other_Sales**
+
+```{r}
+df %>%
+  summarise(is_NULL=sum(is.na(Other_Sales)==1),
+            is_NOT_NULL=sum(!is.na(Other_Sales)==1)
+            )
+```
+
+```{r}
+df %>%
+  filter(!is.na(Other_Sales))%>%
+  summarise(
+    Max=max(Other_Sales),
+    Min=min(Other_Sales),
+    Mean=mean(Other_Sales),
+    Median=median(Other_Sales),
+    QUA1=quantile(Other_Sales,1/4),
+    QUA3=quantile(Other_Sales,3/4),
+    IQR=IQR(Other_Sales)
+)
+```
+
+.There is no null value on Other_Sales column but for minimum value, there are "0" values on column.
+
+### **4.2.5 Global Sales**
+
+```{r}
+df %>%
+  summarise(is_NULL=sum(is.na(Global_Sales)==1),
+            is_NOT_NULL=sum(!is.na(Global_Sales)==1)
+            )
+```
+
+```{r}
+df%>%
+  filter(!is.na(Global_Sales))%>%
+  summarise(
+    Max=max(Global_Sales),
+    Min=min(Global_Sales),
+    Mean=mean(Global_Sales),
+    Median=median(Global_Sales),
+    QUA1=quantile(Global_Sales,1/4),
+    QUA3=quantile(Global_Sales,3/4),
+    IQR=IQR(Global_Sales)
+)
+```
+
+.There is no null or "0" values on Global_Sales column. The max sales is 82.53 and min sales is 0.01.
+
+### **4.2.6 Critic_Score**
+
+```{r}
+df %>%
+  summarise(is_NULL=sum(is.na(Critic_Score)==1),
+            is_NOT_NULL=sum(!is.na(Critic_Score)==1)
+            )
+```
+
+```{r}
+df %>%
+  filter(!is.na(Critic_Score))%>%
+  summarise(
+    Max=max(Critic_Score),
+    Min=min(Critic_Score),
+    Mean=mean(Critic_Score),
+    Median=median(Critic_Score),
+    QUA1=quantile(Critic_Score,1/4),
+    QUA3=quantile(Critic_Score,3/4),
+    IQR=IQR(Critic_Score)
+)
+```
+
+.The result show that Critic_Score column has 5952 null values.\
+.When excluding the null values, the max score is 98 and the minimum score is 13.
+
+### **4.2.7 Critic_Count**
+
+```{r}
+df %>%
+  summarise(is_NULL=sum(is.na(Critic_Count)==1),
+            is_NOT_NULL=sum(!is.na(Critic_Count)==1)
+            )
+```
+
+```{r}
+df %>%
+  filter(!is.na(Critic_Count))%>%
+  summarise(
+    Max=max(Critic_Count),
+    Min=min(Critic_Count),
+    Mean=mean(Critic_Count),
+    Median=median(Critic_Count),
+    QUA1=quantile(Critic_Count,1/4),
+    QUA3=quantile(Critic_Count,3/4),
+    IQR=IQR(Critic_Count)
+)
+```
+
+.The result show that Critic_Count column has 5952 null values.\
+.When excluding the null values, the max number of media give critics is 113 and the min number of media give critics is 3.
+
+### **4.2.8 User_Score**
+
+```{r}
+df %>%
+  summarise(is_NULL=sum(is.na(User_Score)==1),
+            is_NOT_NULL=sum(!is.na(User_Score)==1),
+            is_tbd=sum(User_Score=="tbd")
+            )
+```
+
+```{r}
+df %>%
+  mutate(User_Score = as.numeric(User_Score)) %>%
+  filter(!is.na(User_Score) & User_Score!="tbd") %>%
+  summarise(
+    Max=max(User_Score),
+    Min=min(User_Score),
+    Mean=mean(User_Score),
+    Median=median(User_Score),
+    QUA1=quantile(User_Score,1/4),
+    QUA3=quantile(User_Score,3/4),
+    IQR=IQR(User_Score)
+  )
+```
+
+. There is no null value on User_Score column, however there are "0" values and "tbd" values on column.
+
+### **4.2.9 User_Count**
+
+```{r}
+df %>%
+  summarise(is_NULL=sum(is.na(User_Count)==1),
+            is_NOT_NULL=sum(!is.na(User_Count)==1)
+            )
+```
+
+```{r}
+df %>%
+  filter(!is.na(User_Count))%>%
+  summarise(
+    Max=max(User_Count),
+    Min=min(User_Count),
+    Mean=mean(User_Count),
+    Median=median(User_Count),
+    QUA1=quantile(User_Count,1/4),
+    QUA3=quantile(User_Count,3/4),
+    IQR=IQR(User_Count)
+)
+```
+
+.The result show that User_Count column has 6327 null values.\
+.When excluding the null values, the max number of users give critics is 10665 and the min number of users give critics is 4.
+
+## **4.3 Dataset Summary**
+
+A quick summary of the dataset will be shown here.
+
+```{r}
+summary(df)
+```
+
+## **4.4 Detecting Outliers in Global_Sales**
+
+.Since this notebook focuses on implementing the models to predict Global_Sales, it requires outliers detection in this column.
+
+```{r}
+outlier_global_sales <- qplot(y = Global_Sales, ylab = "Outliers Global Sales", data = df, geom = "boxplot", fill=I("tomato")) + theme_minimal() + theme(axis.text.x = element_text(angle = 90))
+outlier_global_sales
+```
+
+# **5. Data Preprocessing**
+
+This section focuses on cleaning/preparing the dataset before implement it to the models.
+
+## **5.1 Creating and Dropping Features and Observations**
+
+### **5.1.1 Dropping Unrelated Features**
+
+Unrelated variables (such as NA_Sales, EU_Sales, JP_Sales, Other_Sales)
+
+```{r}
+df = subset(df, select = -c(NA_Sales,EU_Sales,JP_Sales,Other_Sales))
+```
+
+### **5.1.2 Delete "PCFX" and "GG" in Platform**
+
+Since PCFX and GG only have 1 observations, these observations will be deleted to simplify the sampling process.
+
+```{r}
+df <- subset(df, df$Platform != "PCFX")
+df <- subset(df, df$Platform != "GG")
+```
+
+### **5.1.3 Creating New Features**
+
+```{r}
+df$Year_of_Release <- 2024 - df$Year_of_Release
+names(df)[3] <- "Age"
+```
+
+## **5.2 Data Cleaning**
+
+Cleaning the null values and dirty data.
+
+### **5.2.1 Deleting Null Rows**
+
+In the name and genre column, there are 2 null values.\
+In this case, the data/rows will be deleted.
+
+```{r}
+df <- subset(df, df$Name != "" | df$Genre != "")
+```
+
+### **5.2.2 Fill Blank/Null Values with NA**
+
+The dataset contains some blank/null values.\
+In order to make good analysis, the null values should be filled with NA.
+
+```{r}
+is.na(df) <- df == ''
+```
+
+### **5.2.3 Cleaning Dirty Data**
+
+In user score column, there are some "tbd" values.\
+The "tbd" values will be replaced with NA to make good analysis.
+
+```{r}
+df$User_Score <- as.character(df$User_Score)
+df$User_Score[df$User_Score == "tbd"] <- ""
+```
+
+### **5.2.4 Plot Missing Values**
+
+```{r}
+plot_missing(df)
+```
+
+After deleting, filling blank values with NA values, it still shows high percentages of missing data in the video games sales dataset.
+
+## **5.3 Data Imputation**
+
+.In this section, missing values will be filled using the data imputation technique.
+
+### **5.3.1 Imputation w/ MICE**
+
+.This section will impute the missing values with MICE package.\
+.In order to fill missing categorical value in dataset, it is necessary to convert the categorical values into numbers before calling MICE package.
+
+```{r}
+# Convert categorical to numbers
+df$User_Score=as.double(df$User_Score)
+
+df_imputation <- data.frame(df$Age, df$Rating, df$Critic_Score, df$Critic_Count, df$User_Score, df$User_Count)
+names(df_imputation) <- c("Age_imp","Rating_imp", "Critic_Score_imp", "Critic_Count_imp", "User_Score_imp", "User_Count_imp")
+
+df_imputation$Rating_imp = factor(df_imputation$Rating_imp, 
+                       levels = c('AO', 'E', 'E10+', 'EC', 'K-A', 'M', 'RP', 'T'), labels = c(1, 2, 3, 4, 5, 6, 7, 8))
+```
+
+```{r}
+# Imputation w/ MICE
+
+md.pattern(df_imputation)
+df_imputation_imp <- mice(df_imputation, m=5, seed = 123)
+df_imputation <- complete(df_imputation_imp, 1)
+plot_missing(df_imputation)
+```
+
+```{r}
+# Revert numbers to categorical
+
+df_imputation$Rating_imp = factor(df_imputation$Rating_imp, 
+                       levels = c(1, 2, 3, 4, 5, 6, 7, 8), labels = c('AO', 'E', 'E10+', 'EC', 'K-A', 'M', 'RP', 'T'))
+df <- df %>% mutate(ID = row_number())
+df_imputation <- df_imputation %>% mutate(ID = row_number())
+df <- merge(df,df_imputation,by="ID")
+df = subset(df, select = -c(ID, Rating, Age, Critic_Score, Critic_Count, User_Score, User_Count))
+```
+
+# **6. Data visualization and analysis**
+
+## **6.1 Top 10 Publisher**
+
+```{r}
+publisher_data <- df %>%
+  group_by(Publisher) %>%
+  summarise(count = n()) %>%
+  top_n(n = 10, wt = count)
+
+publisher_charts <- ggplot(publisher_data, aes(x = Publisher, y = count, fill=count)) + geom_col(fill="orange")+
+  labs(title = "Top 10 Publisher", x="Publisher",y="Total") + coord_flip()
+publisher_charts
+```
+
+.Electronic Arts became the publisher with the most released games on the market, followed by Activision and Namco Bandai Games.
+
+## **6.2 Top 5 Genre**
+
+```{r}
+genre_data <- df %>%
+  group_by(Genre) %>%
+  summarise(count = n()) %>%
+  top_n(n = 5, wt = count)
+
+genre_charts <- ggplot(genre_data, aes(x = Genre, y = count, fill=count)) + geom_col(fill="red")+
+  labs(title = "Top 5 Genres", x="Genre",y="Total")
+genre_charts
+```
+
+.Action is the most popular video game genre on the market, followed by Sports and Misc.
+
+## **6.3 Top 5 Platform**
+
+```{r}
+platform_data <- df %>%
+  group_by(Platform) %>%
+  summarise(count = n()) %>%
+  top_n(n = 5, wt = count)
+
+platform_charts <- ggplot(platform_data, aes(x = Platform, y = count, fill=count)) + geom_col(fill="yellow")+
+  labs(title = "Top 5 Platform", x="Platform",y="Total")
+platform_charts
+```
+
+.PS2 became the platform that had the most video games, followed by DS and PS3.
+
+## **6.4 Genre based on Rating**
+
+```{r}
+qplot(x = Genre, data = df) + geom_bar(fill = "purple") + coord_flip()  + facet_wrap(~Rating_imp, nrow = 2)
+```
+
+.Most of the video games on the market are rated E and the majority of genres rated E are the Sports genre.\
+.Moreover, the T and M ratings are other ratings that have the most video games on the market, with Action being the majority of the genres for the T and M ratings.
+
+## **6.5 Platform based on Genre**
+
+```{r}
+qplot(x=Platform,data=df)+ geom_bar(fill="navy") + theme(axis.text = element_text) + coord_flip() + theme_minimal() + facet_wrap(~Genre,nrow=1)
+```
+
+.Most of the video games on the market are video games for PS2, DS, PS3 and X360.\
+.The majority of game genres for those platforms are Action and Sports.
+
+## **6.6 Platform based on Rating**
+
+```{r}
+qplot(x=Platform,data=df)+ geom_bar(fill="brown") + theme(axis.text = element_text) + coord_flip() + theme_minimal() + facet_wrap(~Rating_imp,nrow=1)
+```
+
+.The DS platform has video games rated E followed by PS2 and Wii the most.\
+.As for video games with a T rating, PS2 became the platform that had the most video games for that rating, followed by PS and PS3.
+
+## **6.7 Correlation Matrix**
+
+```{r}
+cor_df <- data.frame(df$Age_imp, df$Critic_Score_imp, df$Critic_Count_imp, df$User_Score_imp, df$User_Count_imp, df$Global)
+cor_matrix<-cor(cor_df)
+corrplot(cor_matrix, diag = FALSE, order = "FPC", tl.pos = "td", tl.cex = 0.5, method = "circle",type="upper")
+```
+
+.It can be seen that the Critic_Count_imp column and User_Score_imp column have a high correlation (close to 1).
+
+# **7. Dataset Preparation**
+
+```{r}
+df1 = subset(df, select = -c(Name, Publisher, Developer))
+```
+
+```{r}
+# Exp 1 - train:test 70:30, seed 555
+
+set.seed(555)
+split = sample.split(df1$Global, SplitRatio = 0.7)
+train_dataset1 = subset(df1, split == TRUE)
+test_dataset1 = subset(df1, split == FALSE)
+```
+
+```{r}
+# Exp 2 - train:test 70:30, seed 555, outliers removed, data scaling
+
+Q <- quantile(df1$Global_Sales, probs=c(.25, .75), na.rm = FALSE)
+iqr <- IQR(df1$Global_Sales)
+df1_clean<- subset(df1, df1$Global_Sales > (Q[1] - 1.5*iqr) & df1$Global_Sales < (Q[2]+1.5*iqr))
+
+set.seed(555)
+split = sample.split(df1_clean$Global, SplitRatio = 0.7)
+train_dataset2 = subset(df1_clean, split == TRUE)
+test_dataset2 = subset(df1_clean, split == FALSE)
+
+train_dataset2[,3] = scale(train_dataset2[,3], center = TRUE, scale = TRUE)
+test_dataset2[,3] = scale(test_dataset2[,3], center = TRUE, scale = TRUE)
+train_dataset2[,6:9] = scale(train_dataset2[,6:9], center = TRUE, scale = TRUE)
+test_dataset2[,6:9] = scale(test_dataset2[,6:9], center = TRUE, scale = TRUE)
+```
+
+# **8. Prediction**
+
+## **8.1 Multiple Linear Regression**
+
+```{r}
+### Exp 1 - Multiple Linear Regression
+regressor1 = lm(formula = Global_Sales ~ .,
+               data = train_dataset1)
+summary(regressor1)
+summ(regressor1, confint = TRUE)
+
+
+y1 = predict(regressor1, train_dataset1)
+table(y1, train_dataset1$Global_Sales)
+
+y_pred1 = predict(regressor1, test_dataset1)
+table(y_pred1, test_dataset1$Global_Sales)
+```
+
+```{r}
+# RMSE on training set
+RMSE(y1, train_dataset1$Global_Sales)
+
+# RMSE on test set
+RMSE(y_pred1, test_dataset1$Global_Sales)
+
+# MAE train dataset
+MAE(y1, train_dataset1$Global_Sales)
+
+# MAE test dataset
+MAE(y_pred1, test_dataset1$Global_Sales)
+```
+
+```{r}
+### Exp 2 - Multiple Linear Regression
+regressor2 = lm(formula = Global_Sales ~ .,
+               data = train_dataset2)
+summary(regressor2)
+summ(regressor2, confint = TRUE)
+
+
+y2 = predict(regressor2, train_dataset2)
+table(y2, train_dataset2$Global_Sales)
+
+y_pred2 = predict(regressor2, test_dataset2)
+table(y_pred2, test_dataset2$Global_Sales)
+```
+
+```{r}
+# RMSE on training set
+RMSE(y2, train_dataset2$Global_Sales)
+# RMSE on test set
+RMSE(y_pred2, test_dataset2$Global_Sales)
+# MAE train dataset
+MAE(y2, train_dataset2$Global_Sales)
+# MAE test dataset
+MAE(y_pred2, test_dataset2$Global_Sales)
+```
+
+.It can be concluded that data scaling, outlier deletion, and differences in data splitting make the RMSE and MAE training value with the RMSE and MAE test value not have a significant difference.
